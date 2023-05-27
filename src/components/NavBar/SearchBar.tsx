@@ -9,13 +9,14 @@ import { useSearchTokens } from 'graphql/data/SearchTokens'
 import useDebounce from 'hooks/useDebounce'
 import { useIsNftPage } from 'hooks/useIsNftPage'
 import { useOnClickOutside } from 'hooks/useOnClickOutside'
+import { atom, useAtom } from 'jotai'
 import { organizeSearchResults } from 'lib/utils/searchBar'
 import { Box } from 'nft/components/Box'
 import { Row } from 'nft/components/Flex'
 import { magicalGradientOnHover } from 'nft/css/common.css'
 import { useIsMobile, useIsTablet } from 'nft/hooks'
 import { useIsNavSearchInputVisible } from 'nft/hooks/useIsNavSearchInputVisible'
-import { ChangeEvent, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import styled from 'styled-components/macro'
 
@@ -40,8 +41,20 @@ const KeyShortCut = styled.div`
   backdrop-filter: blur(60px);
 `
 
+const searchOpen = atom(false)
+
+const useSearchOpenToggle = () => {
+  const [isOpen, setOpen] = useAtom(searchOpen)
+  return [isOpen, useCallback(() => setOpen((prev) => !prev), [setOpen])] as const
+}
+
+const usePlaceholderText = (isMobileOrTablet: boolean) =>
+  useMemo(() => {
+    return isMobileOrTablet ? t`Search` : t`Search tokens and NFT collections`
+  }, [isMobileOrTablet])
+
 export const SearchBar = () => {
-  const [isOpen, toggleOpen] = useReducer((state: boolean) => !state, false)
+  const [isOpen, toggleOpen] = useSearchOpenToggle()
   const [searchValue, setSearchValue] = useState('')
   const debouncedSearchValue = useDebounce(searchValue, 300)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -50,6 +63,8 @@ export const SearchBar = () => {
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
   const isNavSearchInputVisible = useIsNavSearchInputVisible()
+  const isMobileOrTablet = isMobile || isTablet || !isNavSearchInputVisible
+  const placeholderText = usePlaceholderText(isMobileOrTablet)
 
   useOnClickOutside(searchRef, () => {
     isOpen && toggleOpen()
@@ -92,8 +107,6 @@ export const SearchBar = () => {
     }
   }, [isOpen])
 
-  const isMobileOrTablet = isMobile || isTablet || !isNavSearchInputVisible
-
   const trace = useTrace({ section: InterfaceSectionName.NAVBAR_SEARCH })
 
   const navbarSearchEventProperties = {
@@ -101,9 +114,6 @@ export const SearchBar = () => {
     hasInput: debouncedSearchValue && debouncedSearchValue.length > 0,
     ...trace,
   }
-  const placeholderText = useMemo(() => {
-    return isMobileOrTablet ? t`Search` : t`Search tokens and NFT collections`
-  }, [isMobileOrTablet])
 
   const handleKeyPress = useCallback(
     (event: any) => {
@@ -112,7 +122,7 @@ export const SearchBar = () => {
         !isOpen && toggleOpen()
       }
     },
-    [isOpen]
+    [isOpen, toggleOpen]
   )
 
   useEffect(() => {
@@ -135,6 +145,7 @@ export const SearchBar = () => {
       <Box
         data-cy="search-bar"
         position={{ sm: 'fixed', md: 'absolute' }}
+        background="red300"
         width={{ sm: isOpen ? 'viewWidth' : 'auto', md: 'auto' }}
         ref={searchRef}
         className={clsx(styles.searchBarContainerNft, {
@@ -217,5 +228,18 @@ export const SearchBar = () => {
         </NavIcon>
       )}
     </Trace>
+  )
+}
+
+export const SearchButton = () => {
+  const [isOpen, toggleOpen] = useSearchOpenToggle()
+  const isMobile = useIsMobile()
+  const isTablet = useIsTablet()
+  const placeholderText = usePlaceholderText(isMobile || isTablet)
+
+  return (
+    <NavIcon onClick={toggleOpen} label={placeholderText}>
+      <NavMagnifyingGlassIcon />
+    </NavIcon>
   )
 }
